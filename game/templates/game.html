@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Tic Tac Toe - Chotovai Edition</title>
+    <style>
+        :root { 
+            --cell-size: 100px; 
+            --bg-dark: #0f172a; 
+            --container-bg: #1e293b; 
+            --accent-neon: #00f2ff; 
+            --x-color: #38bdf8; 
+            --o-color: #f43f5e; 
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-dark); color: white; display: flex; flex-direction: column; align-items: center; min-height: 100vh; justify-content: center; margin: 0; padding: 10px; }
+        
+        #waiting-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.98); z-index: 2000;
+            display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+        }
+
+        .menu-btn { padding: 15px 30px; margin: 10px; background: transparent; border: 2px solid var(--accent-neon); color: var(--accent-neon); border-radius: 10px; font-weight: bold; cursor: pointer; }
+        h2 { font-size: 2rem; color: var(--accent-neon); text-shadow: 0 0 10px var(--accent-neon); margin: 10px 0; }
+        .status-box { margin-bottom: 20px; font-size: 1.2rem; height: 30px; }
+        
+        .game-container { position: relative; padding: 12px; background: var(--container-bg); border-radius: 15px; }
+        .grid { display: grid; grid-template-columns: repeat(3, var(--cell-size)); gap: 10px; }
+        
+        .cell { 
+            width: var(--cell-size); height: var(--cell-size); border: none; border-radius: 12px; background: #334155;
+            font-size: 2.5rem; font-weight: 800; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+
+        .cell[data-mark="X"] { color: var(--x-color); text-shadow: 0 0 15px var(--x-color); }
+        .cell[data-mark="O"] { color: var(--o-color); text-shadow: 0 0 15px var(--o-color); }
+
+        .winning-line { position: absolute; background: linear-gradient(90deg, #00f2ff, #38bdf8); border-radius: 10px; z-index: 10; display: none; }
+        
+        /* Winning Lines Logic */
+        .winning-line.line-0-1-2 { width: 90%; height: 6px; top: 18%; left: 5%; display: block; }
+        .winning-line.line-3-4-5 { width: 90%; height: 6px; top: 50%; left: 5%; transform: translateY(-50%); display: block; }
+        .winning-line.line-6-7-8 { width: 90%; height: 6px; bottom: 18%; left: 5%; display: block; }
+        .winning-line.line-0-3-6 { width: 6px; height: 90%; left: 18%; top: 5%; display: block; }
+        .winning-line.line-1-4-7 { width: 6px; height: 90%; left: 50%; top: 5%; transform: translateX(-50%); display: block; }
+        .winning-line.line-2-5-8 { width: 6px; height: 90%; right: 18%; top: 5%; display: block; }
+        .winning-line.line-0-4-8 { width: 125%; height: 6px; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg); display: block; }
+        .winning-line.line-2-4-6 { width: 125%; height: 6px; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); display: block; }
+
+        .btn-reset { margin-top: 30px; padding: 10px 40px; background: transparent; color: var(--accent-neon); border: 2px solid var(--accent-neon); border-radius: 50px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="waiting-overlay">
+        <h2>Waiting for friend...</h2>
+        <p>Send this link to your friend:</p>
+        <input type="text" id="share-link" readonly style="padding: 12px; width: 85%; max-width: 350px; text-align: center; margin-bottom: 20px; border-radius: 5px; background: #0f172a; color: #00f2ff; border: 1px solid #00f2ff;">
+        <button class="menu-btn" onclick="copyLink()">Copy Link</button>
+    </div>
+
+    <h2>TIC TAC TOE(chotovai)</h2>
+    <div class="status-box" id="status-box">Connecting...</div>
+
+    <div class="game-container">
+        <div id="win-line" class="winning-line"></div>
+        <div class="grid">
+            {% for i in "012345678"|make_list %}
+                <button type="button" onclick="handleClick({{ forloop.counter0 }})" id="cell-{{ forloop.counter0 }}" class="cell"></button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <button onclick="resetGame()" class="btn-reset">New Game</button>
+
+    <script>
+        const roomCode = "{{ room_code }}";
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        let gameMode = urlParams.get('mode') || 'single';
+        let playerMark = urlParams.get('p') || 'X';
+        const isFriend = urlParams.get('friend') === 'true';
+
+        const socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws/game/' + roomCode + '/');
+
+        window.onload = function() {
+            if (gameMode === 'double' && !isFriend) {
+                // আপনি প্রথম প্লেয়ার, তাই আপনাকে ওয়েটিং স্ক্রিন দেখাবে
+                document.getElementById('waiting-overlay').style.display = 'flex';
+                
+                // বন্ধুর জন্য পরিচ্ছন্ন লিঙ্ক তৈরি (p=O এবং friend=true)
+                const baseUrl = window.location.origin + window.location.pathname;
+                const friendLink = `${baseUrl}?mode=double&p=O&friend=true`;
+                document.getElementById('share-link').value = friendLink;
+            }
+        }
+
+        function copyLink() {
+            const copyText = document.getElementById("share-link");
+            copyText.select();
+            document.execCommand("copy");
+            alert("Link copied! Send it to your friend.");
+        }
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            
+            // বন্ধু যোগ দিলে ওয়েটিং স্ক্রিন গায়েব হবে
+            if (data.player_count >= 2) {
+                document.getElementById('waiting-overlay').style.display = 'none';
+            }
+
+            data.board.forEach((mark, index) => {
+                const cell = document.getElementById(`cell-${index}`);
+                cell.innerText = mark || "";
+                cell.setAttribute("data-mark", mark || "");
+                cell.disabled = (mark || data.winner);
+            });
+
+            const statusBox = document.getElementById("status-box");
+            if (data.winner) {
+                statusBox.innerHTML = `<span style="color: #4ade80;">Winner: ${data.winner} 🏆</span>`;
+            } else if (!data.board.includes(null)) {
+                statusBox.innerHTML = `<span style="color: #fbbf24;">Draw! 🤝</span>`;
+            } else {
+                statusBox.innerHTML = `Turn: <span style="color: var(--accent-neon);">${data.turn}</span>`;
+            }
+
+            const line = document.getElementById("win-line");
+            if (data.winning_line) {
+                line.className = "winning-line " + data.winning_line;
+                line.style.display = "block";
+            } else {
+                line.className = "winning-line";
+                line.style.display = "none";
+            }
+        };
+
+        function handleClick(index) {
+            socket.send(JSON.stringify({
+                'index': index,
+                'player': playerMark,
+                'mode': gameMode
+            }));
+        }
+
+        function resetGame() {
+            socket.send(JSON.stringify({ 'action': 'reset', 'player': playerMark, 'mode': gameMode }));
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe - Menu</title>
+    <style>
+        :root { --bg: #0f172a; --neon: #00f2ff; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .menu-card { background: #1e293b; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 90%; max-width: 400px; }
+        h1 { color: var(--neon); text-shadow: 0 0 10px var(--neon); margin-bottom: 30px; }
+        .btn-group { display: flex; flex-direction: column; gap: 15px; }
+        .btn { padding: 15px; border: 2px solid var(--neon); border-radius: 10px; background: transparent; color: white; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s; text-decoration: none; }
+        .btn:hover { background: var(--neon); color: var(--bg); box-shadow: 0 0 20px var(--neon); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="menu-card" id="main-menu">
+        <h1>TIC TAC TOE</h1>
+        <div class="btn-group">
+            <button class="btn" onclick="showPlayerSelect()">SINGLE PLAYER (vs CPU)</button>
+            <button class="btn" onclick="goToDouble()">DOUBLE PLAYER (vs Friend)</button>
+        </div>
+    </div>
+
+    <div class="menu-card hidden" id="player-select">
+        <h1>Select Your Side</h1>
+        <div class="btn-group">
+            <button class="btn" onclick="startSingle('X')">Play as X</button>
+            <button class="btn" onclick="startSingle('O')">Play as O</button>
+            <button class="btn" style="border-color: #64748b; color: #64748b;" onclick="location.reload()">Back</button>
+        </div>
+    </div>
+
+    <script>
+        function showPlayerSelect() {
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('player-select').classList.remove('hidden');
+        }
+
+        function startSingle(side) {
+            const room = 'single_' + Math.random().toString(36).substr(2, 9);
+            window.location.href = `/game/${room}/?mode=single&p=${side}`;
+        }
+
+        function goToDouble() {
+            const room = 'room_' + Math.random().toString(36).substr(2, 9);
+            // প্রথম প্লেয়ার হিসেবে p=X নিয়ে রুমে ঢুকছে
+            window.location.href = `/game/${room}/?mode=double&p=X`;
+        }
+    </script>
+</body>
+</html>
